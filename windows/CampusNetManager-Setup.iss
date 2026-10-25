@@ -1,12 +1,12 @@
 ﻿#define MyAppName "校园网自动登录通用脚本"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 
 [Setup]
 AppId={{B575F925-EB8D-4727-ACC3-60619A48C088}
 AppName={#MyAppName}
 AppVerName={#MyAppName} {#MyAppVersion}
-VersionInfoVersion=1.0.0.0
-VersionInfoProductVersion=1.0.0
+VersionInfoVersion=1.1.0.0
+VersionInfoProductVersion=1.1.0
 DefaultDirName={autopf}\CampusNetUniversal
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes

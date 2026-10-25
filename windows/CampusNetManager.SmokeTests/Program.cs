@@ -40,6 +40,84 @@ Check(
     !CampusLoginClient.IsDeviceLimitMessage("账号或密码错误"),
     "匹配实际门户错误文本"
 );
+Check(
+    "热点可上网时不切换",
+    !WifiSwitchPolicy.ShouldSwitch(
+        enabled: true,
+        campusVisible: true,
+        currentInternetAvailable: true
+    ),
+    "当前网络可正常上网"
+);
+Check(
+    "断网时允许切换校园网",
+    WifiSwitchPolicy.ShouldSwitch(
+        enabled: true,
+        campusVisible: true,
+        currentInternetAvailable: false
+    ),
+    "仅在当前网络不可上网时切换"
+);
+Check(
+    "自动切换开关关闭",
+    !WifiSwitchPolicy.ShouldSwitch(
+        enabled: false,
+        campusVisible: true,
+        currentInternetAvailable: false
+    ),
+    "默认不切换网络"
+);
+var throttleNow = DateTime.UtcNow;
+Check(
+    "三秒内重复检查去抖",
+    !CheckThrottlePolicy.ShouldRun(
+        throttleNow.AddSeconds(-1),
+        throttleNow,
+        force: false,
+        TimeSpan.FromSeconds(3)
+    ),
+    "网络事件不会重复请求门户"
+);
+Check(
+    "超过三秒允许检查",
+    CheckThrottlePolicy.ShouldRun(
+        throttleNow.AddSeconds(-4),
+        throttleNow,
+        force: false,
+        TimeSpan.FromSeconds(3)
+    ),
+    "正常定时检查不受影响"
+);
+Check(
+    "手动检查强制运行",
+    CheckThrottlePolicy.ShouldRun(
+        throttleNow.AddMilliseconds(-100),
+        throttleNow,
+        force: true,
+        TimeSpan.FromSeconds(3)
+    ),
+    "立即登录按钮始终可触发"
+);
+Check(
+    "DNS 失败分类",
+    CampusLoginClient.DescribeHttpFailure(
+        new HttpRequestException(
+            "test",
+            new SocketException((int)SocketError.HostNotFound)
+        )
+    ).Contains("DNS", StringComparison.Ordinal),
+    "门户 DNS 错误可识别"
+);
+Check(
+    "连接拒绝分类",
+    CampusLoginClient.DescribeHttpFailure(
+        new HttpRequestException(
+            "test",
+            new SocketException((int)SocketError.ConnectionRefused)
+        )
+    ).Contains("连接被拒绝", StringComparison.Ordinal),
+    "门户连接拒绝可识别"
+);
 
 using var server = new MockSelfServiceServer(captchaBytes);
 server.Start();
@@ -119,7 +197,12 @@ Check(
     $"注销={string.Join(",", server.OfflineCalls)}"
 );
 
-var loginCount = server.LoginCount;
+server.Sessions.Clear();
+server.Sessions.Add(new MockSession(
+    "AABBCCDDEEFF", "55", "2026-10-21 12:20:00"));
+server.Sessions.Add(new MockSession(
+    "112233445566", "99", "2026-10-21 12:10:00"));
+server.OfflineCalls.Clear();
 var missingMac = await SelfServiceClient.CleanupOwnSessionsAsync(
     "2026000001",
     "test-password",
@@ -129,10 +212,12 @@ var missingMac = await SelfServiceClient.CleanupOwnSessionsAsync(
     dashboardUrl: server.DashboardUrl
 );
 Check(
-    "缺少 MAC 时停止",
-    !missingMac.LoggedIn &&
-    server.LoginCount == loginCount,
-    "未尝试登录自助服务"
+    "完全缺少 MAC 时注销最旧会话",
+    missingMac.LoggedIn &&
+    missingMac.RemovedSessions == 1 &&
+    !missingMac.MatchedDevice &&
+    server.OfflineCalls.SequenceEqual(new[] { "99" }),
+    $"注销={string.Join(",", server.OfflineCalls)}"
 );
 
 using var portal = new MockPortalServer(server);

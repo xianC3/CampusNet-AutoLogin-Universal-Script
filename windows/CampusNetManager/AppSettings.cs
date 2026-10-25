@@ -20,6 +20,7 @@ public sealed class AppSettings
     public string SelfServiceDashboardUrl { get; set; } =
         DefaultSelfServiceDashboardUrl;
     public List<string> CampusSsids { get; set; } = new();
+    public bool AutoSwitchWifiEnabled { get; set; } = false;
     public bool AutoLoginEnabled { get; set; } = true;
     public string InterfaceName { get; set; } = "WLAN";
     public int RequestTimeoutSeconds { get; set; } = 8;
